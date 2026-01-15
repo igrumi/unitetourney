@@ -16,7 +16,6 @@ export default function Registro() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   
-  // NUEVO: Estados para controlar la edición
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [nuevoJugador, setNuevoJugador] = useState<Jugador>({
     nombre: "", apellido: "", rut: "", username: "", playerId: "", nacionalidad: ""
@@ -33,7 +32,7 @@ export default function Registro() {
 
   const abrirModalParaEdicion = (index: number) => {
     setEditIndex(index);
-    setNuevoJugador(jugadores[index]); // Cargamos los datos actuales en el formulario
+    setNuevoJugador(jugadores[index]);
     setIsModalOpen(true);
   };
 
@@ -45,12 +44,10 @@ export default function Registro() {
 
   const guardarJugador = () => {
     if (editIndex !== null) {
-      // Lógica de EDITAR
       const nuevosJugadores = [...jugadores];
       nuevosJugadores[editIndex] = nuevoJugador;
       setJugadores(nuevosJugadores);
     } else {
-      // Lógica de AGREGAR
       if (jugadores.length < 10) {
         setJugadores([...jugadores, nuevoJugador]);
       }
@@ -63,7 +60,7 @@ export default function Registro() {
       <h2 className="text-4xl font-black italic mb-10 tracking-tighter uppercase">Registro de Equipo</h2>
 
       <div className="space-y-8 bg-unite-dark border border-white/10 p-8 rounded-lg">
-        {/* SECCIÓN LOGO Y NOMBRE (Se mantiene igual que antes) */}
+        {/* SECCIÓN LOGO Y NOMBRE */}
         <div className="flex flex-col md:flex-row gap-8 items-start">
           <div className="flex flex-col items-center gap-4">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Logo del Equipo</label>
@@ -78,10 +75,13 @@ export default function Registro() {
           </div>
         </div>
 
-        {/* LISTA DE JUGADORES CON OPCIÓN DE EDITAR */}
+        {/* LISTA DE JUGADORES */}
         <div>
           <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest">Roster ({jugadores.length}/10)</label>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest">Roster ({jugadores.length}/10)</label>
+              <p className="text-[9px] text-unite-blue mt-1">Primeros 5: Titulares | Resto: Suplentes</p>
+            </div>
             {jugadores.length < 10 && (
               <button onClick={abrirModalParaNuevo} className="bg-unite-accent text-xs font-bold px-6 py-2 rounded-sm hover:bg-unite-blue transition cursor-pointer">
                 + AÑADIR JUGADOR
@@ -90,22 +90,33 @@ export default function Registro() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {jugadores.map((j, index) => (
-              <div key={index} className="bg-white/5 border border-white/5 p-4 rounded-sm flex justify-between items-center group hover:border-unite-blue/50 transition">
-                <div>
-                  <p className="font-bold italic text-white tracking-tight">{j.username.toUpperCase()}</p>
-                  <p className="text-[10px] text-gray-400 uppercase">{j.nombre} {j.apellido} | {j.nacionalidad}</p>
+            {jugadores.map((j, index) => {
+              // LÓGICA DE ASIGNACIÓN AUTOMÁTICA
+              const esTitular = index < 5;
+
+              return (
+                <div key={index} className={`bg-white/5 border p-4 rounded-sm flex justify-between items-center group transition ${esTitular ? 'border-white/10' : 'border-dashed border-white/5 opacity-80'}`}>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold italic text-white tracking-tight">{j.username.toUpperCase()}</p>
+                      {/* ETIQUETA DINÁMICA */}
+                      <span className={`text-[8px] px-2 py-0.5 font-black uppercase rounded-full ${esTitular ? 'bg-unite-blue text-white' : 'bg-gray-700 text-gray-400'}`}>
+                        {esTitular ? 'Titular' : 'Suplente'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 uppercase">{j.nombre} {j.apellido} | {j.nacionalidad}</p>
+                  </div>
+                  <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => abrirModalParaEdicion(index)} className="text-unite-blue hover:text-white text-[10px] font-bold uppercase underline decoration-unite-blue underline-offset-4">
+                      Editar
+                    </button>
+                    <button onClick={() => setJugadores(jugadores.filter((_, i) => i !== index))} className="text-red-500 hover:text-white text-[10px] font-bold uppercase underline decoration-red-500 underline-offset-4">
+                      Quitar
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => abrirModalParaEdicion(index)} className="text-unite-blue hover:text-white text-[10px] font-bold uppercase underline decoration-unite-blue underline-offset-4">
-                    Editar
-                  </button>
-                  <button onClick={() => setJugadores(jugadores.filter((_, i) => i !== index))} className="text-red-500 hover:text-white text-[10px] font-bold uppercase underline decoration-red-500 underline-offset-4">
-                    Quitar
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -114,10 +125,10 @@ export default function Registro() {
         </button>
       </div>
 
-      {/* MODAL MULTIPROPÓSITO (AGREGAR/EDITAR) */}
+      {/* MODAL (Se mantiene igual, solo asegúrate de pasar los values correctos) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-          <div className="bg-unite-dark border border-unite-accent/30 w-full max-w-md p-8 rounded-sm">
+          <div className="bg-unite-dark border border-unite-accent/30 w-full max-w-md p-8 rounded-sm shadow-2xl">
             <h3 className="text-xl font-black italic mb-6 text-white border-b border-white/10 pb-2">
               {editIndex !== null ? "EDITAR JUGADOR" : "NUEVO JUGADOR"}
             </h3>
@@ -131,7 +142,6 @@ export default function Registro() {
                 <label className="text-[10px] text-gray-500 font-bold mb-1 block">APELLIDO</label>
                 <input value={nuevoJugador.apellido} className="w-full bg-black border border-white/10 p-2 text-sm outline-none focus:border-unite-accent" onChange={(e) => setNuevoJugador({...nuevoJugador, apellido: e.target.value})} />
               </div>
-              {/* ... Repite este patrón de "value={nuevoJugador.campo}" para los demás inputs ... */}
               <div className="col-span-1">
                 <label className="text-[10px] text-gray-500 font-bold mb-1 block text-unite-blue">RUT</label>
                 <input value={nuevoJugador.rut} className="w-full bg-black border border-white/10 p-2 text-sm outline-none focus:border-unite-accent" onChange={(e) => setNuevoJugador({...nuevoJugador, rut: e.target.value})} />
@@ -145,15 +155,15 @@ export default function Registro() {
                 <input value={nuevoJugador.username} className="w-full bg-black border border-white/10 p-2 text-sm outline-none focus:border-unite-accent" onChange={(e) => setNuevoJugador({...nuevoJugador, username: e.target.value})} />
               </div>
               <div className="col-span-2">
-                <label className="text-[10px] text-gray-500 font-bold mb-1 block">PLAYER ID (POKÉMON UNITE)</label>
+                <label className="text-[10px] text-gray-500 font-bold mb-1 block text-unite-blue">PLAYER ID (POKÉMON UNITE)</label>
                 <input value={nuevoJugador.playerId} className="w-full bg-black border border-white/10 p-2 text-sm outline-none focus:border-unite-accent" onChange={(e) => setNuevoJugador({...nuevoJugador, playerId: e.target.value})} />
               </div>
             </div>
 
             <div className="flex gap-4 mt-8">
               <button onClick={() => setIsModalOpen(false)} className="flex-1 border border-white/10 py-3 text-xs font-bold hover:bg-red-500 transition">CANCELAR</button>
-              <button onClick={guardarJugador} className="flex-1 bg-unite-blue text-white py-3 text-xs font-bold hover:bg-white hover:text-black transition uppercase">
-                {editIndex !== null ? "Guardar Cambios" : "Agregar"}
+              <button onClick={guardarJugador} className="flex-1 bg-unite-blue text-white py-3 text-xs font-bold hover:bg-white hover:text-black transition uppercase italic">
+                {editIndex !== null ? "Guardar Cambios" : "Añadir al Roster"}
               </button>
             </div>
           </div>
