@@ -82,6 +82,15 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./out
+      - name: Discord Notification
+        if: success() 
+        run: |
+          curl -H "Content-Type: application/json" \
+          -X POST \
+          -d '{
+            "content": "🚀 **¡Proyecto Desplegado!**\nNueva versión de **Liga Platinum** desplegada.\nURL: https://ligaplatinum5.kase.moe \n @<146187721252143104>"
+          }' \
+          ${{ secrets.DISCORD_WEBHOOK }}
 
   # Deployment job
   deploy:
