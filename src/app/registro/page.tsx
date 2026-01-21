@@ -2,6 +2,13 @@
 import { useState, ChangeEvent } from "react";
 import { supabase } from "@/lib/supabase"; // Asegúrate de haber creado este archivo
 import { useRouter } from "next/navigation";
+import {
+  validarRut,
+  formatearRut,
+  formatearPlayerId,
+  PAISES_LATAM,
+} from "@/utils/formatters";
+import { toast } from 'sonner';
 
 interface Jugador {
   nombre: string;
@@ -19,7 +26,8 @@ export default function Registro() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false); // Estado para evitar doble clic
-
+  const [rutError, setRutError] = useState(false);
+  const [idError, setIdError] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [nuevoJugador, setNuevoJugador] = useState<Jugador>({
     nombre: "",
@@ -30,10 +38,68 @@ export default function Registro() {
     nacionalidad: "",
   });
 
+  const handleRutBlur = (valor: string) => {
+    const formateado = formatearRut(valor);
+    const esValido = validarRut(formateado);
+
+    setNuevoJugador({ ...nuevoJugador, rut: formateado });
+    setRutError(!esValido && valor.length > 0); // Solo marcar error si escribió algo
+  };
+
+  // Función para manejar la validación del Player ID al salir del campo
+  const handleIdBlur = (valor: string) => {
+    const formateado = formatearPlayerId(valor);
+    // Un ID válido debe tener el '#' y 7 caracteres después (Total 8)
+    const esValido = formateado.length === 8;
+
+    setNuevoJugador({ ...nuevoJugador, playerId: formateado });
+    setIdError(!esValido && valor.length > 0);
+  };
+
+  const validarYGuardar = () => {
+    const { nombre, apellido, username, rut, playerId, nacionalidad } =
+      nuevoJugador;
+
+    // 1. Validaciones de largo comunes
+    if (nombre.length > 20 || apellido.length > 20) {
+      toast.error("Nombre y Apellido no deben superar los 20 caracteres.");
+      return;
+    }
+    if (username.length > 12) {
+      toast.error("El Username no debe superar los 12 caracteres.");
+      return;
+    }
+
+    // 2. Validación de RUT solo si es Chileno
+    if (nacionalidad === "Chile") {
+      if (!validarRut(rut)) {
+        setRutError(true);
+        toast.error("El RUT ingresado no es válido. Por favor, revísalo.");
+        return;
+      }
+    } else {
+      // Si no es Chile, solo verificamos que no esté vacío
+      if (rut.trim().length < 5) {
+        toast.error("Por favor ingresa un número de documento válido.");
+        return;
+      }
+    }
+
+    // 3. Validación de Player ID
+    if (playerId.length !== 8) {
+      setIdError(true);
+      toast.error("El Player ID debe tener el formato # + 7 caracteres.");
+      return;
+    }
+
+    toast.success(`${username} añadido al roster`);
+    guardarJugador();
+  };
+
   // --- LÓGICA DE SUPABASE ---
   const finalizarRegistro = async () => {
     if (!teamName || jugadores.length < 5) {
-      alert("Por favor, ingresa el nombre del equipo y al menos 5 jugadores.");
+      toast.warning("Por favor, ingresa el nombre del equipo y al menos 5 jugadores.");
       return;
     }
 
@@ -75,10 +141,10 @@ export default function Registro() {
 
       if (playersError) throw playersError;
 
-      alert("¡Registro exitoso! Tu equipo ha sido inscrito.");
+      toast.success("¡Registro exitoso! Tu equipo ha sido inscrito.");
       router.push("/equipos");
     } catch (error: any) {
-      alert("Error en el registro: " + error.message);
+      toast.error("Error en el registro: " + error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -108,7 +174,7 @@ export default function Registro() {
       rut: "",
       username: "",
       playerId: "",
-      nacionalidad: "",
+      nacionalidad: "Chile",
     });
     setIsModalOpen(true);
   };
@@ -265,16 +331,18 @@ export default function Registro() {
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[100] flex items-center justify-center p-4">
           <div className="bg-unite-dark border border-unite-accent/30 w-full max-w-md p-8 rounded-sm shadow-2xl">
-            <h3 className="text-xl font-black italic mb-6 text-white border-b border-white/10 pb-2">
-              {editIndex !== null ? "EDITAR JUGADOR" : "NUEVO JUGADOR"}
+            <h3 className="text-xl font-black italic mb-6 text-white border-b border-white/10 pb-2 uppercase">
+              {editIndex !== null ? "Editar Jugador" : "Nuevo Jugador"}
             </h3>
 
             <div className="grid grid-cols-2 gap-4">
+              {/* NOMBRE */}
               <div className="col-span-1">
-                <label className="text-[10px] text-gray-500 font-bold mb-1 block">
-                  NOMBRE
+                <label className="text-[10px] text-gray-500 font-bold mb-1 block uppercase">
+                  Nombre ({nuevoJugador.nombre.length}/20)
                 </label>
                 <input
+                  maxLength={20}
                   value={nuevoJugador.nombre}
                   className="w-full bg-black border border-white/10 p-2 text-sm outline-none focus:border-unite-accent text-white"
                   onChange={(e) =>
@@ -282,11 +350,14 @@ export default function Registro() {
                   }
                 />
               </div>
+
+              {/* APELLIDO */}
               <div className="col-span-1">
-                <label className="text-[10px] text-gray-500 font-bold mb-1 block">
-                  APELLIDO
+                <label className="text-[10px] text-gray-500 font-bold mb-1 block uppercase">
+                  Apellido ({nuevoJugador.apellido.length}/20)
                 </label>
                 <input
+                  maxLength={20}
                   value={nuevoJugador.apellido}
                   className="w-full bg-black border border-white/10 p-2 text-sm outline-none focus:border-unite-accent text-white"
                   onChange={(e) =>
@@ -297,38 +368,75 @@ export default function Registro() {
                   }
                 />
               </div>
+
+              {/* RUT CON FORMATEO AL SALIR */}
               <div className="col-span-1">
-                <label className="text-[10px] text-gray-500 font-bold mb-1 block text-unite-blue">
-                  RUT
+                <label
+                  className={`text-[10px] font-bold mb-1 block transition-colors ${
+                    rutError ? "text-red-500" : "text-unite-blue"
+                  }`}
+                >
+                  {nuevoJugador.nacionalidad === "Chile"
+                    ? "RUT (CHILE)"
+                    : "DOCUMENTO / DNI"}
                 </label>
                 <input
+                  placeholder={
+                    nuevoJugador.nacionalidad === "Chile" ? "" : "Nº Documento"
+                  }
                   value={nuevoJugador.rut}
-                  className="w-full bg-black border border-white/10 p-2 text-sm outline-none focus:border-unite-accent text-white"
                   onChange={(e) =>
                     setNuevoJugador({ ...nuevoJugador, rut: e.target.value })
                   }
+                  onBlur={(e) => {
+                    // SOLO formateamos y validamos si es Chile
+                    if (nuevoJugador.nacionalidad === "Chile") {
+                      handleRutBlur(e.target.value);
+                    } else {
+                      setRutError(false); // No hay error de formato RUT para otros países
+                    }
+                  }}
+                  className={`w-full bg-black border p-2 text-sm outline-none transition-all ${
+                    rutError
+                      ? "border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]"
+                      : "border-white/10 focus:border-unite-accent"
+                  } text-white`}
                 />
               </div>
+
+              {/* NACIONALIDAD - DROPDOWN */}
               <div className="col-span-1">
-                <label className="text-[10px] text-gray-500 font-bold mb-1 block text-white">
+                <label className="text-[10px] text-gray-500 font-bold mb-1 block">
                   NACIONALIDAD
                 </label>
-                <input
+                <select
                   value={nuevoJugador.nacionalidad}
-                  className="w-full bg-black border border-white/10 p-2 text-sm outline-none focus:border-unite-accent text-white"
-                  onChange={(e) =>
+                  className="w-full bg-black border border-white/10 p-2 text-sm outline-none focus:border-unite-accent text-white cursor-pointer"
+                  onChange={(e) => {
+                    const selectedCountry = e.target.value;
                     setNuevoJugador({
                       ...nuevoJugador,
-                      nacionalidad: e.target.value,
-                    })
-                  }
-                />
+                      nacionalidad: selectedCountry,
+                      rut: "", // Limpiamos el RUT/DNI para evitar conflictos de formato
+                    });
+                    setRutError(false); // Reseteamos el error visual al cambiar de país
+                  }}
+                >
+                  {PAISES_LATAM.map((pais) => (
+                    <option key={pais} value={pais}>
+                      {pais}
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              {/* USERNAME */}
               <div className="col-span-2">
-                <label className="text-[10px] text-gray-500 font-bold mb-1 block text-white">
-                  USERNAME (IN-GAME)
+                <label className="text-[10px] text-gray-500 font-bold mb-1 block">
+                  USERNAME ({nuevoJugador.username.length}/12)
                 </label>
                 <input
+                  maxLength={12}
                   value={nuevoJugador.username}
                   className="w-full bg-black border border-white/10 p-2 text-sm outline-none focus:border-unite-accent text-white"
                   onChange={(e) =>
@@ -339,19 +447,30 @@ export default function Registro() {
                   }
                 />
               </div>
+
+              {/* PLAYER ID CON FORMATEO AL SALIR */}
               <div className="col-span-2">
-                <label className="text-[10px] text-gray-500 font-bold mb-1 block text-unite-blue">
-                  PLAYER ID (POKÉMON UNITE)
+                <label
+                  className={`text-[10px] font-bold mb-1 block transition-colors ${idError ? "text-red-500" : "text-unite-blue"}`}
+                >
+                  PLAYER ID{" "}
+                  {idError ? "(DEBE TENER 7 CARACTERES)" : "(POKÉMON UNITE)"}
                 </label>
                 <input
+                  placeholder="22QYH2A"
                   value={nuevoJugador.playerId}
-                  className="w-full bg-black border border-white/10 p-2 text-sm outline-none focus:border-unite-accent text-white"
+                  onBlur={(e) => handleIdBlur(e.target.value)}
                   onChange={(e) =>
                     setNuevoJugador({
                       ...nuevoJugador,
                       playerId: e.target.value,
                     })
                   }
+                  className={`w-full bg-black border p-2 text-sm outline-none transition-all ${
+                    idError
+                      ? "border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]"
+                      : "border-white/10 focus:border-unite-accent"
+                  } text-white uppercase`}
                 />
               </div>
             </div>
@@ -359,12 +478,12 @@ export default function Registro() {
             <div className="flex gap-4 mt-8">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="flex-1 border border-white/10 py-3 text-xs font-bold hover:bg-red-500 transition text-white"
+                className="flex-1 border border-white/10 py-3 text-xs font-bold hover:bg-red-500 transition text-white uppercase"
               >
-                CANCELAR
+                Cancelar
               </button>
               <button
-                onClick={guardarJugador}
+                onClick={validarYGuardar}
                 className="flex-1 bg-unite-blue text-white py-3 text-xs font-bold hover:bg-white hover:text-black transition uppercase italic"
               >
                 {editIndex !== null ? "Guardar Cambios" : "Añadir al Roster"}
