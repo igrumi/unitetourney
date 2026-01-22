@@ -296,7 +296,7 @@ export default function Registro() {
   };
 
   return (
-    <div className="min-h-screen pt-20 px-6 max-w-4xl mx-auto mb-20">
+    <div className="min-h-screen pt-6 px-6 max-w-4xl mx-auto mb-20">
       <h2 className="text-4xl font-black italic mb-10 tracking-tighter uppercase text-white">
         Registro de Equipo
       </h2>
