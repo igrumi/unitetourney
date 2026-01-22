@@ -7,8 +7,9 @@ import {
   formatearRut,
   formatearPlayerId,
   PAISES_LATAM,
+  supabaseErrorTranslator,
 } from "@/utils/formatters";
-import { toast } from 'sonner';
+import { toast } from "sonner";
 
 interface Jugador {
   nombre: string;
@@ -99,12 +100,15 @@ export default function Registro() {
   // --- LÓGICA DE SUPABASE ---
   const finalizarRegistro = async () => {
     if (!teamName || jugadores.length < 5) {
-      toast.warning("Por favor, ingresa el nombre del equipo y al menos 5 jugadores.");
+      toast.warning(
+        "Por favor, ingresa el nombre del equipo y al menos 5 jugadores.",
+      );
       return;
     }
 
     setIsSubmitting(true);
-
+    const loadingToast = toast.loading("Enviando inscripción...");
+    
     try {
       // 1. Insertar el Equipo
       const { data: teamData, error: teamError } = await supabase
@@ -118,9 +122,10 @@ export default function Registro() {
         .select()
         .single();
 
+      // Interceptamos error de nombre de equipo duplicado
       if (teamError) throw teamError;
 
-      // 2. Preparar los Jugadores incluyendo la columna is_captain
+      // 2. Preparar los Jugadores
       const jugadoresParaInsertar = jugadores.map((j, index) => ({
         team_id: teamData.id,
         username: j.username,
@@ -130,8 +135,8 @@ export default function Registro() {
         rut: j.rut,
         nationality: j.nacionalidad,
         order_index: index,
-        is_substitute: index >= 5, // Automático: del 6 al 10 son suplentes
-        is_captain: index === 0, // Automático: el primero de la lista es capitán
+        is_substitute: index >= 5,
+        is_captain: index === 0,
       }));
 
       // 3. Insertar Jugadores
@@ -139,12 +144,22 @@ export default function Registro() {
         .from("Player")
         .insert(jugadoresParaInsertar);
 
+      // Interceptamos errores de RUT o Username duplicado
       if (playersError) throw playersError;
 
-      toast.success("¡Registro exitoso! Tu equipo ha sido inscrito.");
+      toast.success("¡Registro exitoso! Tu equipo ha sido inscrito.", {
+        id: loadingToast,
+      });
       router.push("/equipos");
     } catch (error: any) {
-      toast.error("Error en el registro: " + error.message);
+      // USAMOS LA FUNCIÓN DE MAPEÓ AQUÍ
+      const mensajeAmigable = supabaseErrorTranslator(error.message);
+      
+      toast.error("Inscripción rechazada", {
+        id: loadingToast,
+        description: mensajeAmigable,
+        duration: 5000,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -382,18 +397,20 @@ export default function Registro() {
                 </label>
                 <input
                   placeholder={
-                    nuevoJugador.nacionalidad === "Chile" ? "" : "Nº Documento"
+                    nuevoJugador.nacionalidad === "Chile"
+                      ? "204965269"
+                      : "Nº Documento"
                   }
                   value={nuevoJugador.rut}
+                  maxLength={nuevoJugador.nacionalidad === "Chile" ? 12 : 20} // LIMITADOR CLAVE
                   onChange={(e) =>
                     setNuevoJugador({ ...nuevoJugador, rut: e.target.value })
                   }
                   onBlur={(e) => {
-                    // SOLO formateamos y validamos si es Chile
                     if (nuevoJugador.nacionalidad === "Chile") {
                       handleRutBlur(e.target.value);
                     } else {
-                      setRutError(false); // No hay error de formato RUT para otros países
+                      setRutError(false);
                     }
                   }}
                   className={`w-full bg-black border p-2 text-sm outline-none transition-all ${

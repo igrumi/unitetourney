@@ -5,7 +5,10 @@
  */
 export const validarRut = (rut: string): boolean => {
   const limpio = rut.replace(/[^0-9kK]/g, "");
-  if (limpio.length < 8) return false;
+  
+  // Un RUT chileno real tiene entre 8 y 9 caracteres (cuerpo + DV)
+  // Si tiene más de 9 o menos de 8, es inválido de entrada.
+  if (limpio.length < 8 || limpio.length > 9) return false;
 
   const cuerpo = limpio.slice(0, -1);
   const dvRecibido = limpio.slice(-1).toUpperCase();
@@ -19,11 +22,7 @@ export const validarRut = (rut: string): boolean => {
   }
 
   const dvEsperadoNum = 11 - (suma % 11);
-  
-  let dvEsperado = "";
-  if (dvEsperadoNum === 11) dvEsperado = "0";
-  else if (dvEsperadoNum === 10) dvEsperado = "K";
-  else dvEsperado = dvEsperadoNum.toString();
+  let dvEsperado = dvEsperadoNum === 11 ? "0" : dvEsperadoNum === 10 ? "K" : dvEsperadoNum.toString();
 
   return dvRecibido === dvEsperado;
 };
@@ -57,3 +56,24 @@ export const formatearPlayerId = (id: string): string => {
 export const PAISES_LATAM = [
   "Argentina", "Bolivia", "Brasil", "Chile", "Colombia", "México", "Perú", "Uruguay"
 ];
+
+/**
+ * Traduce errores técnicos de la base de datos a mensajes amigables.
+ */
+export const supabaseErrorTranslator = (message: string): string => {
+  if (message.includes('Player_rut_key')) {
+    return "Este RUT ya se encuentra inscrito en el torneo.";
+  }
+  if (message.includes('Player_username_key')) {
+    return "Uno de los nombres de usuario (IGN) ya está registrado en otro equipo.";
+  }
+  if (message.includes('Team_name_key')) {
+    return "Ya existe un equipo registrado con ese nombre.";
+  }
+  if (message.includes('ign_code')) {
+    return "El Player ID ingresado ya está en uso.";
+  }
+  
+  // Mensaje por defecto para errores desconocidos
+  return "Hubo un problema al procesar el registro. Por favor, inténtalo de nuevo.";
+};
