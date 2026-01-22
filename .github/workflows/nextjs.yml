@@ -88,7 +88,16 @@ jobs:
           curl -H "Content-Type: application/json" \
           -X POST \
           -d '{
-            "content": "🚀 **¡Proyecto Desplegado!**\nNueva versión de **Liga Platinum** desplegada.\nURL: https://ligaplatinum5.kase.moe \n @<146187721252143104>"
+            "content": "✅ Nueva versión de **Liga Platinum** desplegada.\nURL: https://ligaplatinum5.kase.moe \n <@146187721252143104>"
+          }' \
+          ${{ secrets.DISCORD_WEBHOOK }}
+      - name: Discord Notification on Failure
+        if: failure()
+        run: |
+          curl -H "Content-Type: application/json" \
+          -X POST \
+          -d '{
+            "content": "❌ **¡ERROR EN EL DESPLIEGUE!**\nLa última actualización de **Liga Platinum** falló.\nRevisa los logs aquí: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\n<@146187721252143104>"
           }' \
           ${{ secrets.DISCORD_WEBHOOK }}
 
