@@ -18,6 +18,7 @@ interface Jugador {
   username: string;
   playerId: string;
   nacionalidad: string;
+  discord: string;
 }
 
 export default function Registro() {
@@ -38,6 +39,7 @@ export default function Registro() {
     username: "",
     playerId: "",
     nacionalidad: "",
+    discord: "",
   });
 
   const handleRutBlur = (valor: string) => {
@@ -59,9 +61,31 @@ export default function Registro() {
   };
 
   const validarYGuardar = () => {
-    const { nombre, apellido, username, rut, playerId, nacionalidad } =
+    const { nombre, apellido, username, rut, playerId, nacionalidad, discord } =
       nuevoJugador;
 
+    if (
+      !nombre.trim() ||
+      !apellido.trim() ||
+      !username.trim() ||
+      !rut.trim() ||
+      !playerId.trim() ||
+      !discord.trim()
+    ) {
+      toast.error("Campos incompletos", {
+        description: "Todos los datos del jugador son obligatorios.",
+      });
+      return;
+    }
+
+    const discordRegex = /^[a-z0-9._]{2,32}$/;
+    if (!discordRegex.test(discord)) {
+      toast.error("Usuario de Discord inválido", {
+        description:
+          "Usa solo minúsculas, números, puntos o guiones bajos (sin espacios).",
+      });
+      return;
+    }
     // 1. Validaciones de largo comunes
     if (nombre.length > 20 || apellido.length > 20) {
       toast.error("Nombre y Apellido no deben superar los 20 caracteres.");
@@ -138,6 +162,11 @@ export default function Registro() {
         });
         return; // Detiene la ejecución completa
       }
+
+      if (j.discord.trim().length < 3) {
+        toast.error(`Discord faltante en ${j.username}`);
+        return;
+      }
     }
 
     // 3. PROCESO DE REGISTRO (Si todas las validaciones previas pasaron)
@@ -196,6 +225,7 @@ export default function Registro() {
         order_index: index,
         is_substitute: index >= 5,
         is_captain: index === 0,
+        discord: j.discord,
       }));
 
       const { error: rpcError } = await supabase.rpc(
@@ -247,6 +277,7 @@ export default function Registro() {
       username: "",
       playerId: "",
       nacionalidad: "Chile",
+      discord: "",
     });
     setIsModalOpen(true);
   };
@@ -388,6 +419,9 @@ export default function Registro() {
                     <p className="text-[10px] text-gray-400 uppercase">
                       {j.nombre} {j.apellido} | {j.nacionalidad}
                     </p>
+                    <p className="text-[9px] text-unite-blue font-bold">
+                      Discord: {j.discord || "No definido"}
+                    </p>
                   </div>
 
                   <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -485,7 +519,7 @@ export default function Registro() {
                 <input
                   placeholder={
                     nuevoJugador.nacionalidad === "Chile"
-                      ? "204965269"
+                      ? "ej: 207045551"
                       : "Nº Documento"
                   }
                   value={nuevoJugador.rut}
@@ -540,6 +574,7 @@ export default function Registro() {
                   USERNAME ({nuevoJugador.username.length}/12)
                 </label>
                 <input
+                  placeholder="ej: kazekyu"
                   maxLength={12}
                   value={nuevoJugador.username}
                   className="w-full bg-black border border-white/10 p-2 text-sm outline-none focus:border-unite-accent text-white"
@@ -561,7 +596,7 @@ export default function Registro() {
                   {idError ? "(DEBE TENER 7 CARACTERES)" : "(POKÉMON UNITE)"}
                 </label>
                 <input
-                  placeholder="22QYH2A"
+                  placeholder="ej: 22QYH2A"
                   value={nuevoJugador.playerId}
                   onBlur={(e) => handleIdBlur(e.target.value)}
                   onChange={(e) =>
@@ -575,6 +610,25 @@ export default function Registro() {
                       ? "border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]"
                       : "border-white/10 focus:border-unite-accent"
                   } text-white uppercase`}
+                />
+              </div>
+
+              {/* DISCORD USER */}
+              <div className="col-span-2">
+                <label className="text-[10px] text-gray-500 font-bold mb-1 block uppercase">
+                  Discord (Nombre de usuario)
+                </label>
+                <input
+                  placeholder="ej: soto.unite"
+                  value={nuevoJugador.discord}
+                  className="w-full bg-black border border-white/10 p-2 text-sm outline-none focus:border-unite-accent text-white"
+                  onChange={(e) => {
+                    // Forzamos minúsculas y eliminamos espacios en tiempo real
+                    const valorLimpio = e.target.value
+                      .toLowerCase()
+                      .replace(/\s/g, "");
+                    setNuevoJugador({ ...nuevoJugador, discord: valorLimpio });
+                  }}
                 />
               </div>
             </div>
