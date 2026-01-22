@@ -30,6 +30,7 @@ export default function Registro() {
   const [rutError, setRutError] = useState(false);
   const [idError, setIdError] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [indexConErrorDB, setIndexConErrorDB] = useState<number | null>(null);
   const [nuevoJugador, setNuevoJugador] = useState<Jugador>({
     nombre: "",
     apellido: "",
@@ -93,41 +94,99 @@ export default function Registro() {
       return;
     }
 
-    toast.success(`${username} añadido al roster`);
+    if (editIndex !== null) {
+      toast.success(`Datos de ${username} actualizados correctamente`);
+    } else {
+      toast.success(`${username} añadido al roster`);
+    }
     guardarJugador();
   };
 
   // --- LÓGICA DE SUPABASE ---
   const finalizarRegistro = async () => {
-    if (!teamName || jugadores.length < 5) {
-      toast.warning(
-        "Por favor, ingresa el nombre del equipo y al menos 5 jugadores.",
-      );
+    // 1. Validaciones previas básicas (Nombre de equipo y cantidad mínima)
+    if (!teamName) {
+      toast.warning("Nombre de equipo faltante", {
+        description:
+          "Debes asignar un nombre a tu equipo antes de registrarlo.",
+      });
       return;
     }
 
+    if (jugadores.length < 5) {
+      toast.warning("Roster incompleto", {
+        description: "Necesitas al menos 5 jugadores para participar.",
+      });
+      return;
+    }
+
+    // 2. VALIDACIÓN DETALLADA POR JUGADOR (Feedback específico)
+    // Recorremos el roster para encontrar errores antes de enviar a Supabase
+    for (const j of jugadores) {
+      // Validar RUT si la nacionalidad es Chile
+      if (j.nacionalidad === "Chile" && !validarRut(j.rut)) {
+        toast.error(`Error en Jugador: ${j.username}`, {
+          description: `El RUT (${j.rut}) no es válido. Por favor, corrígelo.`,
+        });
+        return; // Detiene la ejecución completa
+      }
+
+      // Validar Player ID (formato # + 7 caracteres)
+      if (j.playerId.length !== 8) {
+        toast.error(`Error en Jugador: ${j.username}`, {
+          description: `El Player ID debe tener el formato # + 7 caracteres.`,
+        });
+        return; // Detiene la ejecución completa
+      }
+    }
+
+    // 3. PROCESO DE REGISTRO (Si todas las validaciones previas pasaron)
     setIsSubmitting(true);
-    const loadingToast = toast.loading("Enviando inscripción...");
-    
+    const loadingToast = toast.loading("Procesando inscripción única...");
+
     try {
-      // 1. Insertar el Equipo
-      const { data: teamData, error: teamError } = await supabase
-        .from("Team")
-        .insert([
-          {
-            name: teamName,
-            logo_url: logoPreview,
-          },
-        ])
-        .select()
-        .single();
+      // --- NUEVA VALIDACIÓN PRE-VUELO ---
+      // Extraemos todos los RUTs y Usernames para consultar de una sola vez
+      const rutsAValidar = jugadores.map((j) => j.rut);
+      const usersAValidar = jugadores.map((j) => j.username);
 
-      // Interceptamos error de nombre de equipo duplicado
-      if (teamError) throw teamError;
+      const { data: existentes, error: errorCheck } = await supabase
+        .from("Player")
+        .select("rut, username")
+        .or(
+          `rut.in.(${rutsAValidar.join(",")}),username.in.(${usersAValidar.join(",")})`,
+        );
 
-      // 2. Preparar los Jugadores
-      const jugadoresParaInsertar = jugadores.map((j, index) => ({
-        team_id: teamData.id,
+      if (errorCheck) throw errorCheck;
+
+      if (existentes && existentes.length > 0) {
+        // Si hay duplicados, encontramos el índice del primer culpable en nuestra lista local
+        const duplicado = existentes[0];
+        const idxCulpable = jugadores.findIndex(
+          (j) =>
+            j.rut === duplicado.rut ||
+            j.username.toLowerCase() === duplicado.username.toLowerCase(),
+        );
+
+        if (idxCulpable !== -1) {
+          setIndexConErrorDB(idxCulpable);
+          const campo =
+            jugadores[idxCulpable].rut === duplicado.rut ? "RUT" : "Username";
+
+          toast.error(`Conflicto de datos`, {
+            id: loadingToast,
+            description: `${campo} de ${jugadores[idxCulpable].username} ya está registrado.`,
+          });
+          setIsSubmitting(false);
+          return; // Detenemos el proceso aquí
+        }
+      }
+      // --- FIN VALIDACIÓN PRE-VUELO ---
+
+      // Si pasamos la validación, procedemos con la RPC
+      toast.loading("Enviando inscripción...", { id: loadingToast });
+
+      const jugadoresFormateados = jugadores.map((j, index) => ({
         username: j.username,
         ign_code: j.playerId,
         irl_name: j.nombre,
@@ -139,26 +198,24 @@ export default function Registro() {
         is_captain: index === 0,
       }));
 
-      // 3. Insertar Jugadores
-      const { error: playersError } = await supabase
-        .from("Player")
-        .insert(jugadoresParaInsertar);
+      const { error: rpcError } = await supabase.rpc(
+        "registrar_equipo_completo",
+        {
+          p_team_name: teamName,
+          p_logo_url: logoPreview,
+          p_players: jugadoresFormateados,
+        },
+      );
 
-      // Interceptamos errores de RUT o Username duplicado
-      if (playersError) throw playersError;
+      if (rpcError) throw rpcError;
 
-      toast.success("¡Registro exitoso! Tu equipo ha sido inscrito.", {
-        id: loadingToast,
-      });
+      toast.success("¡Equipo registrado exitosamente!", { id: loadingToast });
       router.push("/equipos");
     } catch (error: any) {
-      // USAMOS LA FUNCIÓN DE MAPEÓ AQUÍ
       const mensajeAmigable = supabaseErrorTranslator(error.message);
-      
-      toast.error("Inscripción rechazada", {
+      toast.error("Error en el servidor", {
         id: loadingToast,
         description: mensajeAmigable,
-        duration: 5000,
       });
     } finally {
       setIsSubmitting(false);
@@ -278,25 +335,51 @@ export default function Registro() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {jugadores.map((j, index) => {
               const esTitular = index < 5;
+
+              // 1. Error de formato (Frontend)
+              const tieneErrorFormato =
+                (j.nacionalidad === "Chile" && !validarRut(j.rut)) ||
+                j.playerId.length !== 8;
+
+              // 2. Error de duplicado (Backend/DB)
+              const esDuplicadoEnDB = indexConErrorDB === index;
+              const mostrarError = tieneErrorFormato || esDuplicadoEnDB;
+
               return (
                 <div
                   key={index}
-                  className={`bg-white/5 border p-4 rounded-sm flex justify-between items-center group transition ${
-                    esTitular
-                      ? "border-white/10"
-                      : "border-dashed border-white/5 opacity-80"
+                  className={`bg-white/5 border p-4 rounded-sm flex justify-between items-center group transition-all duration-300 ${
+                    mostrarError
+                      ? "border-red-600 bg-red-950/20 shadow-[0_0_20px_rgba(220,38,38,0.3)] ring-1 ring-red-600"
+                      : esTitular
+                        ? "border-white/10"
+                        : "border-dashed border-white/5 opacity-80"
                   }`}
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-bold italic text-white tracking-tight">
+                      <p
+                        className={`font-bold italic tracking-tight ${mostrarError ? "text-red-500 underline decoration-dotted" : "text-white"}`}
+                      >
                         {j.username.toUpperCase()}
                       </p>
+
+                      {/* BADGE DE ERROR CON ANIMACIÓN FUERTE */}
+                      {mostrarError && (
+                        <span className="text-[7px] bg-red-600 text-white px-2 py-0.5 font-black uppercase rounded-sm animate-bounce shadow-sm">
+                          {esDuplicadoEnDB
+                            ? "⚠️ YA REGISTRADO"
+                            : "⚠️ DATOS INVÁLIDOS"}
+                        </span>
+                      )}
+
                       <span
                         className={`text-[8px] px-2 py-0.5 font-black uppercase rounded-full ${
-                          esTitular
-                            ? "bg-unite-blue text-white"
-                            : "bg-gray-700 text-gray-400"
+                          mostrarError
+                            ? "bg-red-900/40 text-red-500 border border-red-500/30"
+                            : esTitular
+                              ? "bg-unite-blue text-white"
+                              : "bg-gray-700 text-gray-400"
                         }`}
                       >
                         {esTitular ? "Titular" : "Suplente"}
@@ -306,10 +389,14 @@ export default function Registro() {
                       {j.nombre} {j.apellido} | {j.nacionalidad}
                     </p>
                   </div>
+
                   <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={() => abrirModalParaEdicion(index)}
-                      className="text-unite-blue hover:text-white text-[10px] font-bold uppercase underline"
+                      onClick={() => {
+                        setIndexConErrorDB(null); // Limpiar error al editar
+                        abrirModalParaEdicion(index);
+                      }}
+                      className={`${mostrarError ? "text-white" : "text-unite-blue"} hover:underline text-[10px] font-bold uppercase`}
                     >
                       Editar
                     </button>
