@@ -61,7 +61,7 @@ const SECCIONES = [
 ];
 
 export default function Reglamento() {
-  const [activeId, setActiveId] = useState<number | null>(1);
+  const [activeId, setActiveId] = useState<number | null>(null);
 
   return (
     <div className="min-h-screen pt-6 pb-20 px-6 max-w-4xl mx-auto">
