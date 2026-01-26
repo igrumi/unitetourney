@@ -1,64 +1,97 @@
 "use client";
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useState } from "react";
+import NextLink from 'next/link';
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
+import { Menu, X } from "lucide-react";
 
 export default function Navbar() {
+  const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
   const navLinks = [
     { name: 'INICIO', href: '/' },
     { name: 'REGISTRO', href: '/registro' },
-    { name: 'EQUIPOS', href: '/equipos' }, // Por si decides crearla luego
+    { name: 'EQUIPOS', href: '/equipos' },
+    { name: 'REGLAMENTO', href: '/reglamento' },
   ];
 
   return (
-    <nav className="fixed top-0 w-full z-[100] bg-unite-black/80 backdrop-blur-md border-b border-white/10">
-      <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+    <nav className="fixed top-0 w-full z-[100] bg-black border-b border-white/10 h-20">
+      <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
         
-        {/* LOGO AREA */}
-        <Link href="/" className="flex items-center gap-3 group">
-          
+        {/* LOGO - Z-110 para que siempre esté arriba */}
+        <NextLink href="/" className="flex items-center gap-3 z-[110]">
           <Image 
-            src="/giratina.png" // Ruta relativa a la carpeta public
-            alt="Logo Platinum Unite"
-            width={60}  // Ancho en pixeles
-            height={60} // Alto en pixeles
+            src="/giratina.png" 
+            alt="Logo" 
+            width={60} 
+            height={60} 
             className="object-contain"
           />
-          <div className="flex flex-col">
-            <span className="font-black italic text-xl tracking-tighter leading-none">
-              Asociación<span className="text-unite-blue text-sm ml-1">Platinum</span>
-            </span>
-            <span className="text-[10px] text-gray-500 font-bold tracking-[0.2em] uppercase">League</span>
-          </div>
-        </Link>
+          <span className="font-black italic text-lg tracking-tighter hidden xs:block">
+            PLATINUM<span className="text-unite-blue">UNITE</span>
+          </span>
+        </NextLink>
 
-        {/* NAVEGACIÓN */}
-        <div className="hidden md:flex gap-10">
-          {navLinks.map((link) => {
-            const isActive = pathname === link.href;
-            return (
-              <Link
+        {/* NAVEGACIÓN DESKTOP (Se mantiene igual) */}
+        <div className="hidden md:flex gap-8">
+          {navLinks.map((link) => (
+            <NextLink
+              key={link.name}
+              href={link.href}
+              className={`text-[10px] font-black tracking-[0.2em] hover:text-unite-blue transition-colors ${
+                pathname === link.href ? 'text-unite-accent' : 'text-gray-400'
+              }`}
+            >
+              {link.name}
+            </NextLink>
+          ))}
+        </div>
+
+        {/* BOTÓN HAMBURGUESA - Z-110 para que no lo tape el fondo negro */}
+        <button 
+          className="md:hidden text-white z-[110] p-2 bg-white/5 rounded-md"
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          {isOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+
+        {/* MENÚ MÓVIL - CORREGIDO */}
+        <div className={`
+          fixed inset-0 bg-black z-[105] flex flex-col items-center justify-center transition-all duration-300 ease-in-out
+          ${isOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}
+        `}>
+          {/* Contenedor de links para asegurar que Inicio aparezca */}
+          <div className="flex flex-col items-center gap-10">
+            {navLinks.map((link) => (
+              <NextLink
                 key={link.name}
                 href={link.href}
-                className={`text-xs font-black tracking-[0.2em] transition-colors hover:text-unite-blue ${
-                  isActive ? 'text-unite-accent' : 'text-gray-400'
+                onClick={() => setIsOpen(false)}
+                className={`text-4xl font-black italic tracking-tighter hover:text-unite-blue transition-colors ${
+                  pathname === link.href ? 'text-unite-accent' : 'text-white'
                 }`}
               >
                 {link.name}
-              </Link>
-            );
-          })}
+              </NextLink>
+            ))}
+            
+            <NextLink href="/registro" onClick={() => setIsOpen(false)} className="mt-4">
+              <button className="bg-unite-accent text-white px-10 py-4 font-black italic shadow-[0_0_20px_rgba(212,175,55,0.3)]">
+                ÚNETE AHORA
+              </button>
+            </NextLink>
+          </div>
         </div>
 
-        {/* BOTÓN CTA RÁPIDO */}
-        <div className="flex items-center">
-           <Link href="/registro">
-              <button className="bg-white text-black text-[10px] font-black px-4 py-2 hover:bg-unite-accent hover:text-white transition uppercase italic">
-                Únete ahora
-              </button>
-           </Link>
+        {/* BOTÓN DESKTOP (Se oculta en móvil) */}
+        <div className="hidden md:block">
+          <NextLink href="/registro">
+            <button className="bg-white text-black text-[10px] font-black px-5 py-2 hover:bg-unite-blue hover:text-white transition uppercase italic">
+              Únete ahora
+            </button>
+          </NextLink>
         </div>
       </div>
     </nav>
